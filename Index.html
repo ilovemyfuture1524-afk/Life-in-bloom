@@ -1,1 +1,342 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Life in Bloom</title>
+<style>
+:root{--pink:#ff65a3;--purple:#8054d9;--ink:#402849;--bg:#fff0f8}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(140deg,#fff0f8,#eee5ff);font-family:system-ui,sans-serif;color:var(--ink)}
+header{text-align:center;padding:22px 12px;background:linear-gradient(110deg,#ff78b7,#9b72ef);color:white}
+h1{margin:0;font-size:29px}header p{margin:5px 0}
+main{max-width:650px;margin:auto;padding:14px}
+.card{background:#ffffffed;border:1px solid #f2d6ed;border-radius:18px;padding:16px;margin-bottom:13px;box-shadow:0 5px 18px #75458b12}
+h2{font-size:18px;margin:0 0 12px}
+button,input,select{font:inherit;border-radius:11px;padding:11px;border:1px solid #e5c8e7}
+button{background:linear-gradient(100deg,var(--pink),var(--purple));color:white;border:0;font-weight:700;cursor:pointer}
+button:disabled{opacity:.4}
+input,select{width:100%;margin:5px 0 12px;background:white;color:var(--ink)}
+.primary{width:100%;padding:15px;font-size:17px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#fff0f8;padding:10px;border-radius:12px}
+.track{height:7px;background:#eadced;border-radius:9px;overflow:hidden;margin-top:5px}
+.fill{height:100%;background:linear-gradient(90deg,#ff68a9,#8c65e9)}
+.small{font-size:12px;color:#806987}
+#log p{border-bottom:1px solid #f2e5f2;padding-bottom:10px;line-height:1.5}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{flex:1;min-width:100px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header><h1>🌸 Life in Bloom</h1><p>Your life. Your choices. Your story.</p></header>
+<main>
+<section class="card" id="create">
+<h2>✨ Begin your story</h2>
+<label>Character name</label>
+<input id="name" placeholder="Choose a name" maxlength="30">
+<label>Pronouns</label>
+<select id="pronouns"><option>she/her</option><option>he/him</option><option>they/them</option></select>
+<label>Starting family</label>
+<select id="family">
+<option value="supportive">Supportive family</option>
+<option value="strict">Strict family</option>
+<option value="wealthy">Wealthy family</option>
+<option value="chaotic">Complicated family</option>
+</select>
+<button class="primary" onclick="startLife()">🌷 Start a new life</button>
+</section>
+<div id="game" class="hidden">
+<section class="card">
+<div class="small">YOUR LIFE</div><h2 id="who"></h2>
+<div id="bio"></div><p id="familyStatus"></p>
+</section>
+<section class="card"><h2>💖 Life stats</h2><div class="stats" id="stats"></div></section>
+<section class="card">
+<h2>📖 Life event</h2><div id="event"></div>
+<div class="actions" id="choices"></div>
+</section>
+<section class="card">
+<h2>🌟 Your actions</h2>
+<div class="actions">
+<button onclick="study()">📚 Study</button>
+<button onclick="socialize()">💞 Socialize</button>
+<button onclick="work()">💼 Work</button>
+</div>
+<p class="small">Actions can change your stats, money, and future.</p>
+</section>
+<button class="primary" id="ageup" onclick="ageUp()">🎂 Age Up — next year</button>
+<section class="card"><h2>📜 Life journal</h2><div id="log"></div></section>
+<div class="actions" style="margin-bottom:24px">
+<button onclick="saveGame()">💾 Save</button>
+<button onclick="newLife()">🔄 New life</button>
+</div>
+</div>
+</main>
+<script>
+<script>
+
+let s=null,pending=null,logs=[];
+const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const clamp=n=>Math.max(0,Math.min(100,n));
+
+const eventPool=[
+{title:"A new friendship",text:"Someone wants to get to know you.",choices:[
+["Make a friend",()=>{s.relationships=clamp(s.relationships+12);s.happiness=clamp(s.happiness+7);say("You made a new friend.");}],
+["Keep to yourself",()=>{s.stress=clamp(s.stress-5);say("You took time for yourself.");}]]},
+{title:"An unexpected expense",text:"An unexpected bill arrives.",choices:[
+["Pay what you can",()=>{let n=Math.min(s.money,rand(20,100));s.money-=n;s.stress=clamp(s.stress+4);say("You paid $"+n+" toward the bill.");}],
+["Ask family for help",()=>{s.relationships=clamp(s.relationships+2);let n=rand(0,60);s.money+=n;say("Your family helped with $"+n+".");}]]},
+{title:"A tempting opportunity",text:"A new opportunity could pay off—or go wrong.",choices:[
+["Take the chance",()=>{if(Math.random()<.6){s.happiness=clamp(s.happiness+10);s.money+=rand(10,120);say("Your opportunity worked out.");}else{s.stress=clamp(s.stress+10);s.money=Math.max(0,s.money-rand(0,50));say("Things didn't go as planned.");}}],
+["Play it safe",()=>{s.stress=clamp(s.stress-3);say("You waited for another opportunity.");}]]},
+{title:"A family disagreement",text:"Someone in your family disagrees with you.",choices:[
+["Talk it through",()=>{s.relationships=clamp(s.relationships+rand(1,10));s.stress=clamp(s.stress-4);say("You tried to work things out.");}],
+["Walk away",()=>{s.stress=clamp(s.stress+3);say("You took some space.");}]]},
+{title:"A health check",text:"You have a chance to take better care of yourself.",choices:[
+["Take care of yourself",()=>{s.health=clamp(s.health+rand(2,8));s.money=Math.max(0,s.money-10);say("You made time for your wellbeing.");}],
+["Put it off",()=>{s.stress=clamp(s.stress+3);say("You decided to deal with it later.");}]]},
+{title:"A school challenge",text:"A difficult assignment is coming up.",choices:[
+["Study hard",()=>{s.smarts=clamp(s.smarts+6);s.stress=clamp(s.stress+4);say("You studied for the assignment.");}],
+["Ask for help",()=>{s.smarts=clamp(s.smarts+3);s.relationships=clamp(s.relationships+3);say("You asked someone for help.");}]]},
+{title:"A relationship secret",text:"You discover someone close to you has been keeping a secret.",choices:[
+["Ask honestly",()=>{s.relationships=clamp(s.relationships+rand(-8,5));s.stress=clamp(s.stress+4);say("You asked for the truth.");}],
+["Wait and observe",()=>{s.stress=clamp(s.stress-2);say("You decided to watch what happens.");}]]}
+];
+
+function startLife(){
+const name=document.getElementById("name").value.trim()||"Jamie";
+const fam=document.getElementById("family").value;
+s={name,pronouns:document.getElementById("pronouns").value,age:0,
+health:90,happiness:75,smarts:rand(35,65),looks:rand(40,80),stress:10,
+relationships:fam==="supportive"?80:fam==="chaotic"?35:60,
+money:fam==="wealthy"?5000:100,family:fam,education:0,
+career:"Not started",partner:"Single",children:0,alive:true,jobLevel:0};
+logs=[];
+document.getElementById("create").classList.add("hidden");
+document.getElementById("game").classList.remove("hidden");
+say("Welcome to the world, "+s.name+"! Your life begins.");
+draw();makeEvent();saveGame();
+}
+
+function say(t){
+logs.unshift("Age "+s.age+": "+t);
+logs=logs.slice(0,50);
+}
+
+function esc(t){
+return String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function draw(){
+document.getElementById("who").textContent="🌸 "+s.name+", age "+s.age;
+document.getElementById("bio").textContent=s.alive?
+"Age "+s.age+" · "+s.pronouns+" · "+s.partner+" · "+s.career:"Life completed";
+document.getElementById("familyStatus").textContent=
+"Family: "+s.family+" · Children: "+s.children+" · Education: "+s.education;
+const list=[["❤️ Health",s.health],["😊 Happiness",s.happiness],
+["🧠 Smarts",s.smarts],["✨ Looks",s.looks],
+["😰 Stress",s.stress],["💞 Relationships",s.relationships]];
+document.getElementById("stats").innerHTML=list.map(([n,v])=>
+`<div class="stat">${n} <b>${v}</b><div class="track"><div class="fill" style="width:${v}%"></div></div></div>`
+).join("")+
+`<div class="stat">💵 Money<br><b>$${s.money.toLocaleString()}</b></div>
+<div class="stat">🎓 Education<br><b>${s.education}</b></div>`;
+document.getElementById("log").innerHTML=logs.map(x=>"<p>"+esc(x)+"</p>").join("");
+document.getElementById("ageup").disabled=!s.alive;
+}
+
+function makeEvent(){
+if(!s.alive)return;
+let e;
+if(s.age<5){
+e={title:"A little milestone",text:"You're discovering the world around you.",choices:[
+["Enjoy family time",()=>{s.happiness=clamp(s.happiness+5);s.relationships=clamp(s.relationships+3);say("You spent time with family.");}],
+["Explore everything",()=>{s.smarts=clamp(s.smarts+3);say("Your curiosity grew.");}]]};
+}else if(s.age<18){
+e={title:"Growing up",text:"School, friends, and family are shaping your future.",choices:[
+["Focus on school",()=>{s.smarts=clamp(s.smarts+5);s.education++;say("You worked hard at school.");}],
+["Spend time with friends",()=>{s.relationships=clamp(s.relationships+7);s.happiness=clamp(s.happiness+4);say("You made time for friends.");}]]};
+}else if(s.age<65){
+e=eventPool[rand(0,eventPool.length-1)];
+}else{
+e={title:"A new chapter",text:"How will you spend this year?",choices:[
+["Connect with loved ones",()=>{s.relationships=clamp(s.relationships+7);s.happiness=clamp(s.happiness+4);say("You connected with loved ones.");}],
+["Enjoy a quiet day",()=>{s.stress=clamp(s.stress-7);say("You enjoyed a peaceful day.");}]]};
+}
+pending=e;
+document.getElementById("event").innerHTML="<h3>"+esc(e.title)+"</h3><p>"+esc(e.text)+"</p>";
+document.getElementById("choices").innerHTML=e.choices.map((c,i)=>
+`<button onclick="choose(${i})">${esc(c[0])}</button>`).join("");
+}
+
+function choose(i){
+if(!pending||!s||!s.alive)return;
+const action=pending.choices[i];
+if(!action)return;
+action[1]();pending=null;draw();saveGame();
+document.getElementById("choices").innerHTML="";
+ }
+  
+function study(){
+  if(!s||!s.alive)return;
+  if(s.age<5){
+    say("You are too young for formal studying. You explored and learned through play.");
+    s.smarts=clamp(s.smarts+2);
+  }else if(s.age<22){
+    s.smarts=clamp(s.smarts+rand(2,7));
+    s.education++;
+    s.stress=clamp(s.stress+rand(0,4));
+    say("You studied and improved your knowledge.");
+  }else{
+    s.smarts=clamp(s.smarts+rand(1,4));
+    say("You learned something new.");
+  }
+  draw();saveGame();
+}
+
+function socialize(){
+  if(!s||!s.alive)return;
+  s.relationships=clamp(s.relationships+rand(2,9));
+  s.happiness=clamp(s.happiness+rand(1,6));
+  if(s.age>=16&&s.partner==="Single"&&Math.random()<0.25){
+    s.partner="Dating";
+    say("You met someone special and started dating.");
+  }else if(s.age>=18&&s.partner==="Dating"&&Math.random()<0.15){
+    s.partner="Married";
+    say("Your relationship grew into marriage.");
+  }else{
+    say("You spent time with friends and loved ones.");
+  }
+  draw();saveGame();
+}
+
+function work(){
+  if(!s||!s.alive)return;
+  if(s.age<14){
+    say("You're too young for a regular job. Focus on school and hobbies.");
+    s.happiness=clamp(s.happiness+2);
+  }else if(s.age<18){
+    s.career="Part-time work";
+    s.money+=rand(20,100);
+    say("You earned some money from age-appropriate part-time work.");
+  }else{
+    if(s.career==="Not started"){
+      s.career=["Retail worker","Office assistant","Care worker","Chef","Freelancer"][rand(0,4)];
+      say("You started a new career as a "+s.career+".");
+    }else{
+      s.jobLevel++;
+      say("You gained experience at work.");
+      if(s.jobLevel%3===0){
+        s.career="Senior "+s.career;
+        say("Your hard work earned you a promotion!");
+      }
+    }
+    let pay=rand(500,1800)+(s.jobLevel*100);
+    s.money+=pay;
+    say("You earned $"+pay+" from work.");
+    s.stress=clamp(s.stress+rand(1,5));
+  }
+  draw();saveGame();
+}
+
+function ageUp(){
+  if(!s||!s.alive)return;
+  s.age++;
+  let notes=[];
+
+  if(s.age===5)notes.push("You began your school years.");
+  if(s.age===13)notes.push("You're now a teenager. School and friendships are changing.");
+  if(s.age===18)notes.push("You're now an adult. New career and relationship choices are opening up.");
+  if(s.age===21)notes.push("You're entering adulthood with more independence.");
+  if(s.age===65)notes.push("You've reached retirement age. Consider how you want to spend this chapter.");
+
+  if(s.age>=5&&s.age<18){
+    s.education++;
+    if(Math.random()<0.3)s.smarts=clamp(s.smarts+1);
+  }
+
+  if(s.age>=18&&s.age<65&&s.career!=="Not started"){
+    let salary=rand(250,800)+(s.jobLevel*50);
+    s.money+=salary;
+    notes.push("Your job brought in $"+salary+" this year.");
+  }
+
+  if(s.age>=18&&s.age<80){
+    let bills=rand(50,300);
+    s.money=Math.max(0,s.money-bills);
+    notes.push("Living expenses cost $"+bills+".");
+  }
+
+  s.stress=clamp(s.stress+rand(-3,4));
+  s.happiness=clamp(s.happiness+rand(-4,3));
+
+  if(s.age>50&&Math.random()<0.12){
+    s.health=clamp(s.health-rand(1,7));
+    notes.push("You noticed some age-related changes in your health.");
+  }
+
+  if(s.age>75&&Math.random()<0.04){
+    s.health=clamp(s.health-rand(5,15));
+    notes.push("A health scare reminded you to take care of yourself.");
+  }
+
+  if(s.health<=0||(s.age>=100&&Math.random()<0.5)){
+    s.alive=false;
+    say("Your life story came to an end at age "+s.age+". Your choices made this life uniquely yours.");
+    document.getElementById("event").innerHTML="<h3>🌷 Your story is complete</h3><p>"+esc(s.name)+" lived to age "+s.age+". Start a new life to continue the family legacy.</p>";
+    document.getElementById("choices").innerHTML="";
+  }else{
+    notes.forEach(say);
+    say("You celebrated your "+s.age+"th year of life.");
+  }
+
+  draw();
+  if(s.alive)makeEvent();
+  saveGame();
+}
+
+function saveGame(){
+  if(!s)return;
+  try{
+    localStorage.setItem("lifeInBloomSave",JSON.stringify({s,logs}));
+  }catch(e){
+    alert("Your browser could not save the game. Check your browser storage settings.");
+  }
+}
+
+function loadGame(){
+  try{
+    const raw=localStorage.getItem("lifeInBloomSave");
+    if(!raw)return;
+    const data=JSON.parse(raw);
+    if(!data||!data.s||typeof data.s.age!=="number")return;
+    s=data.s;
+    logs=Array.isArray(data.logs)?data.logs:[];
+    document.getElementById("create").classList.add("hidden");
+    document.getElementById("game").classList.remove("hidden");
+    draw();
+    if(s.alive)makeEvent();
+    else{
+      document.getElementById("event").innerHTML="<h3>🌷 Your story is complete</h3><p>Start a new life when you're ready.</p>";
+      document.getElementById("choices").innerHTML="";
+    }
+  }catch(e){
+    console.log("No saved game could be loaded.");
+  }
+}
+
+function newLife(){
+  if(!confirm("Start a new life? Your current saved life will be replaced."))return;
+  localStorage.removeItem("lifeInBloomSave");
+  s=null;pending=null;logs=[];
+  document.getElementById("game").classList.add("hidden");
+  document.getElementById("create").classList.remove("hidden");
+}
+
+loadGame();
+</script>
+</body>
+</html>
